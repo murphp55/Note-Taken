@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Stack } from "expo-router";
 import { ActivityIndicator, View } from "react-native";
 import { useAuthStore } from "../src/stores/auth-store";
@@ -10,6 +10,10 @@ export default function RootLayout() {
   const user = useAuthStore((s) => s.user);
   const authLoading = useAuthStore((s) => s.loading);
   const initNotes = useNotesStore((s) => s.init);
+  const resetNotes = useNotesStore((s) => s.reset);
+
+  // Track previous userId to detect logout (user transitions from a value to null)
+  const prevUserIdRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
     initAuth();
@@ -19,6 +23,14 @@ export default function RootLayout() {
     if (!user?.id) return;
     initNotes(user.id);
   }, [initNotes, user?.id]);
+
+  // On logout or session expiry: dispose realtime channels and clear local cache
+  useEffect(() => {
+    if (prevUserIdRef.current && !user?.id) {
+      resetNotes();
+    }
+    prevUserIdRef.current = user?.id;
+  }, [user?.id, resetNotes]);
 
   if (authLoading) {
     return (

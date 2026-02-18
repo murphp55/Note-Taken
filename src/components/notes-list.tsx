@@ -1,11 +1,15 @@
 import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { useVisibleNotes } from "../hooks/use-visible-notes";
+import { useAuthStore } from "../stores/auth-store";
 import { useNotesStore } from "../stores/notes-store";
 
 export function NotesList() {
   const notes = useVisibleNotes();
   const activeNoteId = useNotesStore((s) => s.activeNoteId);
   const setActiveNote = useNotesStore((s) => s.setActiveNote);
+  const hasMore = useNotesStore((s) => s.hasMore);
+  const loadMoreNotes = useNotesStore((s) => s.loadMoreNotes);
+  const userId = useAuthStore((s) => s.user?.id);
 
   return (
     <FlatList
@@ -23,6 +27,13 @@ export function NotesList() {
           </Pressable>
         );
       }}
+      ListFooterComponent={
+        hasMore ? (
+          <Pressable style={styles.loadMore} onPress={() => userId && loadMoreNotes(userId)}>
+            <Text style={styles.loadMoreText}>Load more</Text>
+          </Pressable>
+        ) : null
+      }
       ListEmptyComponent={
         <View style={styles.emptyWrap}>
           <Text style={styles.emptyText}>No notes found</Text>
@@ -39,5 +50,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 15, fontWeight: "600", color: "#111827" },
   time: { fontSize: 12, color: "#6B7280" },
   emptyWrap: { padding: 24, alignItems: "center" },
-  emptyText: { color: "#6B7280" }
+  emptyText: { color: "#6B7280" },
+  loadMore: { marginTop: 8, paddingVertical: 10, alignItems: "center", borderRadius: 8, borderWidth: 1, borderColor: "#D1D5DB" },
+  loadMoreText: { color: "#374151", fontWeight: "600" }
 });

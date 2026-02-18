@@ -24,7 +24,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   init: async () => {
     const { data } = await supabase.auth.getSession();
     set({ session: data.session, user: data.session?.user ?? null, loading: false });
-    supabase.auth.onAuthStateChange((_event, session) => {
+    supabase.auth.onAuthStateChange((event, session) => {
+      // TOKEN_REFRESHED: session already contains the rotated tokens — update state.
+      // SIGNED_OUT (manual logout or expired/revoked token): user is now null.
+      //   TabsLayout's <Redirect> navigates to login. Notes store cleanup is
+      //   triggered by _layout.tsx watching user transition to null.
       set({ session, user: session?.user ?? null, loading: false });
     });
   },

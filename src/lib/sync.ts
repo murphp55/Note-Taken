@@ -3,6 +3,8 @@ import { supabase } from "./supabase";
 import { localCache } from "./storage";
 import { Note, Folder, Tag, NoteTag } from "../types/domain";
 
+const PAGE_SIZE = 200;
+
 type SyncCallbacks = {
   onNotes: (notes: Note[]) => void;
   onFolders: (folders: Folder[]) => void;
@@ -10,7 +12,7 @@ type SyncCallbacks = {
   onNoteTags: (noteTags: NoteTag[]) => void;
 };
 
-const mergeLww = (local: Note[], remote: Note[]): Note[] => {
+export const mergeLww = (local: Note[], remote: Note[]): Note[] => {
   const map = new Map<string, Note>();
   for (const item of local) {
     map.set(item.id, item);
@@ -31,9 +33,14 @@ const mergeLww = (local: Note[], remote: Note[]): Note[] => {
 export class SyncEngine {
   private channels: RealtimeChannel[] = [];
 
-  async bootstrap(userId: string, cb: SyncCallbacks): Promise<void> {
+  async bootstrap(userId: string, cb: SyncCallbacks): Promise<{ hasMore: boolean }> {
     const [notesRes, foldersRes, tagsRes, noteTagsRes] = await Promise.all([
-      supabase.from("notes").select("*").eq("user_id", userId).order("updated_at", { ascending: false }),
+      supabase
+        .from("notes")
+        .select("*")
+        .eq("user_id", userId)
+        .order("updated_at", { ascending: false })
+        .limit(PAGE_SIZE),
       supabase.from("folders").select("*").eq("user_id", userId).order("name", { ascending: true }),
       supabase.from("tags").select("*").eq("user_id", userId).order("name", { ascending: true }),
       supabase.from("note_tags").select("note_id, tag_id")
@@ -44,6 +51,25 @@ export class SyncEngine {
     cb.onFolders((foldersRes.data ?? []) as Folder[]);
     cb.onTags((tagsRes.data ?? []) as Tag[]);
     cb.onNoteTags((noteTagsRes.data ?? []) as NoteTag[]);
+
+    return { hasMore: (notesRes.data?.length ?? 0) === PAGE_SIZE };
+  }
+
+  async loadMore(
+    userId: string,
+    cursor: string,
+    onNotes: (notes: Note[]) => void
+  ): Promise<{ hasMore: boolean }> {
+    const { data } = await supabase
+      .from("notes")
+      .select("*")
+      .eq("user_id", userId)
+      .order("updated_at", { ascending: false })
+      .lt("updated_at", cursor)
+      .limit(PAGE_SIZE);
+
+    onNotes((data ?? []) as Note[]);
+    return { hasMore: (data?.length ?? 0) === PAGE_SIZE };
   }
 
   subscribe(userId: string, refresh: () => Promise<void>): void {
@@ -62,12 +88,10 @@ export class SyncEngine {
       .on("postgres_changes", { event: "*", schema: "public", table: "tags", filter: `user_id=eq.${userId}` }, refresh)
       .subscribe();
 
-    const noteTagsChannel = supabase
-      .channel(`note_tags:${userId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "note_tags" }, refresh)
-      .subscribe();
-
-    this.channels.push(noteChannel, folderChannel, tagChannel, noteTagsChannel);
+    // note_tags has no user_id column and cannot be filtered at the subscription level.
+    // Subscribing without a filter fires for every authenticated user's tag changes.
+    // Cross-device note_tag changes are picked up on the next notes or tags refresh instead.
+    this.channels.push(noteChannel, folderChannel, tagChannel);
   }
 
   dispose(): void {
