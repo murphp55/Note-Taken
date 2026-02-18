@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "AppName",
+    "slug": "appname-notes",
+    "scheme": "appname",
+    "version": "0.1.0",
+    "orientation": "default",
+    "userInterfaceStyle": "automatic",
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ],
+    "plugins": [
+      "expo-router",
+      "expo-secure-store"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.appname.notes"
+    },
+    "android": {
+      "package": "com.appname.notes"
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "extra": {
+      "supabaseUrl": "${SUPABASE_URL}",
+      "supabaseAnonKey": "${SUPABASE_ANON_KEY}",
+      "apiBaseUrl": "${APP_API_BASE_URL}",
+      "googleWebClientId": "${GOOGLE_WEB_CLIENT_ID}"
+    }
+  }
+}
