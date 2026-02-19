@@ -12,7 +12,7 @@ const {
   ANTHROPIC_API_KEY
 } = process.env;
 
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !SUPABASE_SERVICE_ROLE_KEY || !ANTHROPIC_API_KEY) {
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !SUPABASE_SERVICE_ROLE_KEY) {
   throw new Error("Missing required env vars for API server.");
 }
 
@@ -25,7 +25,7 @@ app.use(express.json({ limit: "2mb" }));
 const ALLOWED_ORIGIN = process.env.API_ALLOWED_ORIGIN ?? "*";
 app.use((_req, res, next) => {
   res.setHeader("Access-Control-Allow-Origin", ALLOWED_ORIGIN);
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Api-Key");
   next();
 });
@@ -482,6 +482,278 @@ app.post("/v1/ai/stream", async (req, res) => {
       // Response already closed; nothing to do.
     }
   }
+});
+
+// ---------------------------------------------------------------------------
+// Phase 6 — CRUD REST endpoints (API key auth)
+// Any LLM with a valid API key can use these directly as tools.
+// ---------------------------------------------------------------------------
+
+const CreateNoteSchema = z.object({
+  title: z.string().optional(),
+  content: z.string().optional(),
+  folder_id: z.string().uuid().nullable().optional()
+});
+
+const UpdateNoteSchema = z.object({
+  title: z.string().optional(),
+  content: z.string().optional(),
+  folder_id: z.string().uuid().nullable().optional()
+}).refine((d) => Object.keys(d).length > 0, { message: "Body must contain at least one field" });
+
+const CreateFolderSchema = z.object({
+  name: z.string().min(1),
+  parent_id: z.string().uuid().nullable().optional()
+});
+
+const RenameFolderSchema = z.object({ name: z.string().min(1) });
+const CreateTagSchema = z.object({ name: z.string().min(1) });
+
+async function requireApiKey(
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction
+) {
+  const user = await getUserFromApiKey(req.headers["x-api-key"] as string | undefined);
+  if (!user) {
+    res.status(401).json({ error: "Invalid API key" });
+    return;
+  }
+  res.locals.user = user;
+  next();
+}
+
+// ---- Notes ----------------------------------------------------------------
+
+app.get("/v1/notes", requireApiKey, async (req, res) => {
+  const user = res.locals.user as AuthUser;
+  const { search, folder_id, tag_id, limit = "50", cursor } = req.query as Record<string, string>;
+  const lim = Math.min(parseInt(limit) || 50, 200);
+
+  try {
+    // If filtering by tag, first resolve the set of matching note IDs
+    let tagNoteIds: string[] | null = null;
+    if (tag_id) {
+      const { data: noteTags } = await supabaseAdmin
+        .from("note_tags")
+        .select("note_id")
+        .eq("tag_id", tag_id);
+      tagNoteIds = (noteTags ?? []).map((nt: { note_id: string }) => nt.note_id);
+      if (!tagNoteIds.length) {
+        res.json({ notes: [], hasMore: false });
+        return;
+      }
+    }
+
+    let query = supabaseAdmin
+      .from("notes")
+      .select("id, title, content, folder_id, created_at, updated_at")
+      .eq("user_id", user.id)
+      .order("updated_at", { ascending: false })
+      .limit(lim + 1);
+
+    if (search) query = query.or(`title.ilike.%${search}%,content.ilike.%${search}%`);
+    if (folder_id) query = query.eq("folder_id", folder_id);
+    if (cursor) query = query.lt("updated_at", cursor);
+    if (tagNoteIds) query = query.in("id", tagNoteIds);
+
+    const { data, error } = await query;
+    if (error) { res.status(500).json({ error: error.message }); return; }
+
+    const notes = data ?? [];
+    const hasMore = notes.length > lim;
+    res.json({ notes: hasMore ? notes.slice(0, lim) : notes, hasMore });
+  } catch (e) {
+    res.status(500).json({ error: e instanceof Error ? e.message : "Failed" });
+  }
+});
+
+app.get("/v1/notes/:id", requireApiKey, async (req, res) => {
+  const user = res.locals.user as AuthUser;
+  const { data, error } = await supabaseAdmin
+    .from("notes")
+    .select("id, title, content, folder_id, created_at, updated_at")
+    .eq("id", req.params.id)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (error) { res.status(500).json({ error: error.message }); return; }
+  if (!data) { res.status(404).json({ error: "Note not found" }); return; }
+  res.json(data);
+});
+
+app.post("/v1/notes", requireApiKey, async (req, res) => {
+  const user = res.locals.user as AuthUser;
+  const parsed = CreateNoteSchema.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
+  const now = new Date().toISOString();
+  const { data, error } = await supabaseAdmin
+    .from("notes")
+    .insert({
+      user_id: user.id,
+      title: parsed.data.title ?? "Untitled",
+      content: parsed.data.content ?? "",
+      folder_id: parsed.data.folder_id ?? null,
+      created_at: now,
+      updated_at: now
+    })
+    .select()
+    .single();
+  if (error) { res.status(500).json({ error: error.message }); return; }
+  res.status(201).json(data);
+});
+
+app.patch("/v1/notes/:id", requireApiKey, async (req, res) => {
+  const user = res.locals.user as AuthUser;
+  const parsed = UpdateNoteSchema.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
+  const { data, error } = await supabaseAdmin
+    .from("notes")
+    .update({ ...parsed.data, updated_at: new Date().toISOString() })
+    .eq("id", req.params.id)
+    .eq("user_id", user.id)
+    .select()
+    .single();
+  if (error) { res.status(500).json({ error: error.message }); return; }
+  if (!data) { res.status(404).json({ error: "Note not found" }); return; }
+  res.json(data);
+});
+
+app.delete("/v1/notes/:id", requireApiKey, async (req, res) => {
+  const user = res.locals.user as AuthUser;
+  const { error } = await supabaseAdmin
+    .from("notes")
+    .delete()
+    .eq("id", req.params.id)
+    .eq("user_id", user.id);
+  if (error) { res.status(500).json({ error: error.message }); return; }
+  res.sendStatus(204);
+});
+
+// ---- Note ↔ Tag associations -----------------------------------------------
+
+app.post("/v1/notes/:id/tags/:tagId", requireApiKey, async (req, res) => {
+  const user = res.locals.user as AuthUser;
+  // Ownership check: note must belong to user
+  const { data: note } = await supabaseAdmin
+    .from("notes")
+    .select("id")
+    .eq("id", req.params.id)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (!note) { res.status(404).json({ error: "Note not found" }); return; }
+  const { error } = await supabaseAdmin
+    .from("note_tags")
+    .upsert({ note_id: req.params.id, tag_id: req.params.tagId });
+  if (error) { res.status(500).json({ error: error.message }); return; }
+  res.status(201).json({ ok: true });
+});
+
+app.delete("/v1/notes/:id/tags/:tagId", requireApiKey, async (req, res) => {
+  const user = res.locals.user as AuthUser;
+  const { data: note } = await supabaseAdmin
+    .from("notes")
+    .select("id")
+    .eq("id", req.params.id)
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (!note) { res.status(404).json({ error: "Note not found" }); return; }
+  const { error } = await supabaseAdmin
+    .from("note_tags")
+    .delete()
+    .eq("note_id", req.params.id)
+    .eq("tag_id", req.params.tagId);
+  if (error) { res.status(500).json({ error: error.message }); return; }
+  res.sendStatus(204);
+});
+
+// ---- Folders ---------------------------------------------------------------
+
+app.get("/v1/folders", requireApiKey, async (req, res) => {
+  const user = res.locals.user as AuthUser;
+  const { data, error } = await supabaseAdmin
+    .from("folders")
+    .select("id, name, parent_id, created_at")
+    .eq("user_id", user.id)
+    .order("name");
+  if (error) { res.status(500).json({ error: error.message }); return; }
+  res.json({ folders: data ?? [] });
+});
+
+app.post("/v1/folders", requireApiKey, async (req, res) => {
+  const user = res.locals.user as AuthUser;
+  const parsed = CreateFolderSchema.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
+  const { data, error } = await supabaseAdmin
+    .from("folders")
+    .insert({ user_id: user.id, name: parsed.data.name, parent_id: parsed.data.parent_id ?? null })
+    .select()
+    .single();
+  if (error) { res.status(500).json({ error: error.message }); return; }
+  res.status(201).json(data);
+});
+
+app.patch("/v1/folders/:id", requireApiKey, async (req, res) => {
+  const user = res.locals.user as AuthUser;
+  const parsed = RenameFolderSchema.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
+  const { data, error } = await supabaseAdmin
+    .from("folders")
+    .update({ name: parsed.data.name })
+    .eq("id", req.params.id)
+    .eq("user_id", user.id)
+    .select()
+    .single();
+  if (error) { res.status(500).json({ error: error.message }); return; }
+  if (!data) { res.status(404).json({ error: "Folder not found" }); return; }
+  res.json(data);
+});
+
+app.delete("/v1/folders/:id", requireApiKey, async (req, res) => {
+  const user = res.locals.user as AuthUser;
+  const { error } = await supabaseAdmin
+    .from("folders")
+    .delete()
+    .eq("id", req.params.id)
+    .eq("user_id", user.id);
+  if (error) { res.status(500).json({ error: error.message }); return; }
+  res.sendStatus(204);
+});
+
+// ---- Tags ------------------------------------------------------------------
+
+app.get("/v1/tags", requireApiKey, async (req, res) => {
+  const user = res.locals.user as AuthUser;
+  const { data, error } = await supabaseAdmin
+    .from("tags")
+    .select("id, name")
+    .eq("user_id", user.id)
+    .order("name");
+  if (error) { res.status(500).json({ error: error.message }); return; }
+  res.json({ tags: data ?? [] });
+});
+
+app.post("/v1/tags", requireApiKey, async (req, res) => {
+  const user = res.locals.user as AuthUser;
+  const parsed = CreateTagSchema.safeParse(req.body);
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
+  const { data, error } = await supabaseAdmin
+    .from("tags")
+    .insert({ user_id: user.id, name: parsed.data.name })
+    .select()
+    .single();
+  if (error) { res.status(500).json({ error: error.message }); return; }
+  res.status(201).json(data);
+});
+
+app.delete("/v1/tags/:id", requireApiKey, async (req, res) => {
+  const user = res.locals.user as AuthUser;
+  const { error } = await supabaseAdmin
+    .from("tags")
+    .delete()
+    .eq("id", req.params.id)
+    .eq("user_id", user.id);
+  if (error) { res.status(500).json({ error: error.message }); return; }
+  res.sendStatus(204);
 });
 
 app.listen(8787, () => {

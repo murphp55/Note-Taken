@@ -9,7 +9,7 @@ export default {
     orientation: "default",
     userInterfaceStyle: "automatic",
     platforms: ["ios", "android", "web"],
-    plugins: ["expo-router", "expo-secure-store"],
+    plugins: ["expo-router", "expo-secure-store", "./plugins/with-app-actions"],
     experiments: {
       typedRoutes: true
     },

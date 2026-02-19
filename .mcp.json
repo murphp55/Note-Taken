@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "notetaken": {
+      "command": "npx",
+      "args": ["tsx", "mcp/server.ts"],
+      "env": {
+        "NOTETAKEN_API_URL": "http://localhost:8787",
+        "NOTETAKEN_API_KEY": ""
+      }
+    }
+  }
+}

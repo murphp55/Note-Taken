@@ -137,6 +137,7 @@ Development is organized into five phases that build on each other. Each phase s
 - **Phase 3 — Error Handling and Reliability**: Surface failure modes to the user and close subtle bugs in sync and auth.
 - **Phase 4 — Performance and Scale**: Address limits that appear quickly with real usage (pagination, caching, key revocation).
 - **Phase 5 — Polish and Distribution**: Streaming responses, cross-platform rich text, tests, CI, and packaged desktop builds.
+- **Phase 6 — LLM-Agnostic API + MCP Server**: Expose direct CRUD endpoints so any LLM can act as the brain. Add an MCP server so Claude Code can read and write notes natively from the terminal.
 
 ---
 
@@ -202,3 +203,95 @@ Development is organized into five phases that build on each other. Each phase s
       with `appId`, `productName`, and platform targets, (3) add `electron-updater` for auto-update,
       (4) set up code-signing certificates in CI secrets, (5) add a `dist:desktop` script that builds
       the web bundle then runs `electron-builder`.
+
+### Phase 6: LLM-Agnostic API + MCP Server
+
+Goal: make NoteTaken a dumb filing cabinet that any LLM can drive. The existing `/v1/external/execute`
+endpoint still calls Claude internally; Phase 6 replaces that pattern with direct CRUD endpoints and an
+MCP server so the LLM lives outside the app entirely.
+
+All new endpoints reuse the existing API key auth middleware (`requireApiKey`) from `api/server.ts`.
+
+#### 6a — CRUD REST endpoints (add to `api/server.ts`)
+
+**Notes**
+- [x] `GET  /v1/notes` — list notes for the authenticated user. Supports optional `?search=` (full-text
+      filter on title + content), `?folder_id=`, `?tag_id=`, and `?limit=`/`?cursor=` for pagination.
+      Returns `{ notes: Note[], hasMore: boolean }`.
+- [x] `POST /v1/notes` — create a note. Body: `{ title?: string, content?: string, folder_id?: string }`.
+      Returns the created `Note`.
+- [x] `PATCH /v1/notes/:id` — update a note. Body: `{ title?: string, content?: string, folder_id?: string }`.
+      Returns the updated `Note`.
+- [x] `DELETE /v1/notes/:id` — delete a note. Returns `204 No Content`.
+
+**Folders**
+- [x] `GET  /v1/folders` — list all folders for the user.
+- [x] `POST /v1/folders` — create a folder. Body: `{ name: string, parent_id?: string }`.
+- [x] `PATCH /v1/folders/:id` — rename a folder. Body: `{ name: string }`.
+- [x] `DELETE /v1/folders/:id` — delete a folder (notes are un-foldered, not deleted).
+
+**Tags**
+- [x] `GET  /v1/tags` — list all tags for the user.
+- [x] `POST /v1/tags` — create a tag. Body: `{ name: string }`.
+- [x] `DELETE /v1/tags/:id` — delete a tag.
+- [x] `POST /v1/notes/:id/tags/:tagId` — attach a tag to a note.
+- [x] `DELETE /v1/notes/:id/tags/:tagId` — detach a tag from a note.
+
+#### 6b — MCP server (`mcp/server.ts`)
+
+A standalone MCP server (stdio transport) that wraps the CRUD endpoints above. Run locally alongside
+the API server; registered in Claude Code via `.mcp.json` in the project root.
+
+- [x] Created `mcp/server.ts` using `@modelcontextprotocol/sdk`. Reads `NOTETAKEN_API_URL` and
+      `NOTETAKEN_API_KEY` from environment. Exposes 11 tools:
+      `list_notes`, `get_note`, `create_note`, `update_note`, `delete_note`, `search_notes`,
+      `list_folders`, `create_folder`, `list_tags`, `create_tag`, `add_tag_to_note`.
+- [x] Added `"mcp:dev": "tsx mcp/server.ts"` script to `package.json`.
+- [x] Added `NOTETAKEN_API_URL` and `NOTETAKEN_API_KEY` to `.env.example`.
+
+#### 6c — Claude Code registration
+
+- [x] Created `.mcp.json` in the project root. Claude Code picks this up automatically when you open
+      this project. Fill in `NOTETAKEN_API_KEY` with a key generated from the app settings screen.
+      To register manually: `claude mcp add notetaken -- npx tsx mcp/server.ts`
+
+**To activate the MCP server:**
+1. Start the API server: `npm run api:dev`
+2. In `.mcp.json`, set `NOTETAKEN_API_KEY` to your key (generate one from NoteTaken Settings → API Keys)
+3. Reload this Claude Code session — the `notetaken` tools will be available immediately
+
+---
+
+## Current Status (2026-02-19)
+
+### What's done
+- Supabase project created (`nkmlyvxlxwjszxxqosxc.supabase.co`)
+- `.env` filled in with Supabase URL, anon key, and service role key
+- Database migration applied (`supabase/migrations/20260218_init.sql`)
+- `npm install` complete + `react-native-web` installed
+- `ANTHROPIC_API_KEY` made optional in `api/server.ts` (not needed until AI features are used)
+- API server starts successfully: `npm run api:dev` → listening on port 8787
+- App starts successfully: `npm run web`
+
+### Immediate next steps (in order)
+
+1. **Create your user account** — Supabase signup is rate-limited (3/hour on free tier).
+   Go to Supabase dashboard → Authentication → Users → Add user → Create new user.
+   Enter your email + password, then use **Sign In** (not Create Account) in the app.
+
+2. **Sign in to the app** — use the credentials from step 1.
+
+3. **Generate an API key** — go to Settings in the app → API Keys → generate a key.
+   Paste it into `.mcp.json` as `NOTETAKEN_API_KEY`.
+
+4. **Reload Claude Code** — the `notetaken_*` MCP tools will be available for Claude to
+   read and write notes directly from this session.
+
+### Deferred / not yet started
+- Android App Actions (Gemini on Pixel) — plugin written (`plugins/with-app-actions.js`),
+  deep link route written (`app/new-note.tsx`), but requires `expo prebuild` + `expo run:android`
+  on a physical Pixel device or emulator to test.
+- Web rich text editor (Tiptap) — plain TextInput is used on web today.
+- Integration tests for `api/server.ts`.
+- Electron packaging for desktop distribution.
+- Google OAuth — requires Google Cloud project + Supabase Auth provider config.

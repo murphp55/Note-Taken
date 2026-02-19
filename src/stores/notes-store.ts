@@ -22,7 +22,7 @@ type NotesState = {
   refresh: (userId: string) => Promise<void>;
   loadMoreNotes: (userId: string) => Promise<void>;
   reset: () => void;
-  createNote: (userId: string, folderId?: string | null) => Promise<void>;
+  createNote: (userId: string, folderId?: string | null, title?: string, content?: string) => Promise<void>;
   updateNote: (noteId: string, patch: Partial<Pick<Note, "title" | "content" | "folder_id">>) => Promise<void>;
   deleteNote: (noteId: string) => Promise<void>;
   addTagToNote: (noteId: string, tagId: string) => Promise<void>;
@@ -105,13 +105,13 @@ export const useNotesStore = create<NotesState>((set, get) => ({
     });
     set({ hasMore });
   },
-  createNote: async (userId, folderId) => {
+  createNote: async (userId, folderId, title, content) => {
     const now = new Date().toISOString();
     const newNote: Note = {
       id: uuidv4(),
       user_id: userId,
-      title: "Untitled",
-      content: "",
+      title: title?.trim() || "Untitled",
+      content: content ?? "",
       folder_id: folderId ?? null,
       created_at: now,
       updated_at: now
