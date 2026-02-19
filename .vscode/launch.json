@@ -1,0 +1,32 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "NoteTaken Desktop",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "${workspaceFolder}/node_modules/electron/dist/electron.exe",
+      "args": ["${workspaceFolder}/electron/main.cjs"],
+      "outFiles": [],
+      "sourceMaps": false,
+      "presentation": {
+        "group": "desktop",
+        "order": 1
+      }
+    },
+    {
+      "name": "NoteTaken Desktop (rebuild first)",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "${workspaceFolder}/node_modules/electron/dist/electron.exe",
+      "args": ["${workspaceFolder}/electron/main.cjs"],
+      "preLaunchTask": "build:web",
+      "outFiles": [],
+      "sourceMaps": false,
+      "presentation": {
+        "group": "desktop",
+        "order": 2
+      }
+    }
+  ]
+}
