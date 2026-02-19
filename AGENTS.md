@@ -1,6 +1,6 @@
-# AppName
+# NoteTaken
 
-AppName is a cross-platform personal notes and knowledge management application built with React Native and Expo.  
+NoteTaken is a cross-platform personal notes and knowledge management application built with React Native and Expo.  
 It is designed to work on iOS, Android, web/desktop, and keep user data synchronized in real time across devices.
 
 ## Core Functionality
@@ -113,16 +113,18 @@ submitting to the App Store / Play Store, or publishing the Electron app:
 
 | File | Field | Current placeholder |
 |------|-------|---------------------|
-| `app.json` | `name` | `AppName` |
-| `app.json` | `slug` | `appname-notes` |
-| `app.json` | `scheme` | `appname` |
-| `app.json` | `ios.bundleIdentifier` | `com.appname.notes` |
-| `app.json` | `android.package` | `com.appname.notes` |
-| `app/(auth)/login.tsx:31` | login screen title | `AppName` |
-| `src/lib/storage.ts:4` | MMKV storage ID | `"appname-notes"` |
-| `AGENTS.md` heading | document title | `AppName` |
+| File | Field | Value |
+|------|-------|-------|
+| `app.config.js` | `name` | `NoteTaken` |
+| `app.config.js` | `slug` | `notetaken` |
+| `app.config.js` | `scheme` | `notetaken` |
+| `app.config.js` | `ios.bundleIdentifier` | `com.notetaken.app` |
+| `app.config.js` | `android.package` | `com.notetaken.app` |
+| `app/(auth)/login.tsx:31` | login screen title | `NoteTaken` |
+| `src/lib/storage.ts:4` | MMKV storage ID | `"notetaken"` |
+| `AGENTS.md` heading | document title | `NoteTaken` |
 
-None of these block local web dev (`expo start --web`), but they are required before any release.
+All placeholders have been replaced. Note: `app.json` was converted to `app.config.js` (item 2 of this checklist) so env vars are read from `process.env` at build time instead of as static strings.
 
 ---
 
@@ -192,9 +194,9 @@ Development is organized into five phases that build on each other. Each phase s
       project or full mock of `supabaseAdmin`/`supabaseAnon`.
 - [x] Configure CI (GitHub Actions) — `.github/workflows/ci.yml` runs on every PR and push to `main`:
       installs deps, runs `typecheck`, `lint`, and `npm test`.
-- [ ] Replace the placeholder app name (`AppName`) and bundle identifiers in `app.json` and
-      `AGENTS.md` before any store or public release. Edit `app.json` fields: `name`, `slug`,
-      `ios.bundleIdentifier`, `android.package`. No code changes required.
+- [x] Replace the placeholder app name and bundle identifiers. App renamed to `NoteTaken`; `app.json`
+      converted to `app.config.js` with real env var wiring; bundle ID set to `com.notetaken.app`;
+      MMKV storage ID updated to `"notetaken"`.
 - [ ] Package the Electron build for distribution with code signing and auto-update support.
       Steps: (1) add `electron-builder` as devDependency, (2) configure `build` in `package.json`
       with `appId`, `productName`, and platform targets, (3) add `electron-updater` for auto-update,

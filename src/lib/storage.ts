@@ -1,7 +1,7 @@
 import { MMKV } from "react-native-mmkv";
 import { Note, Folder, Tag, NoteTag } from "../types/domain";
 
-const storage = new MMKV({ id: "appname-notes" });
+const storage = new MMKV({ id: "notetaken" });
 
 const KEYS = {
   notes: "cache.notes",

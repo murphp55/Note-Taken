@@ -28,7 +28,7 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.wrap}>
-      <Text style={styles.title}>AppName</Text>
+      <Text style={styles.title}>NoteTaken</Text>
       <Text style={styles.subtitle}>Personal knowledge system synced in real time.</Text>
       <TextInput style={styles.input} placeholder="Email" autoCapitalize="none" value={email} onChangeText={setEmail} />
       <TextInput
