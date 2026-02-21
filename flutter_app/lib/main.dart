@@ -11,15 +11,15 @@ import 'services/local_cache.dart';
 import 'services/supabase_service.dart';
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-
-  FlutterError.onError = (details) {
-    debugPrint('FLUTTER ERROR: ${details.exception}');
-    debugPrint('${details.stack}');
-    FlutterError.presentError(details);
-  };
-
   await runZonedGuarded(() async {
+    WidgetsFlutterBinding.ensureInitialized();
+
+    FlutterError.onError = (details) {
+      debugPrint('FLUTTER ERROR: ${details.exception}');
+      debugPrint('${details.stack}');
+      FlutterError.presentError(details);
+    };
+
     await dotenv.load(fileName: '.env');
     await initSupabase();
     await initHive();
