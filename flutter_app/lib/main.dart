@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,10 +12,22 @@ import 'services/supabase_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await dotenv.load(fileName: '.env');
-  await initSupabase();
-  await initHive();
-  runApp(const ProviderScope(child: NoteTakenApp()));
+
+  FlutterError.onError = (details) {
+    debugPrint('FLUTTER ERROR: ${details.exception}');
+    debugPrint('${details.stack}');
+    FlutterError.presentError(details);
+  };
+
+  await runZonedGuarded(() async {
+    await dotenv.load(fileName: '.env');
+    await initSupabase();
+    await initHive();
+    runApp(const ProviderScope(child: NoteTakenApp()));
+  }, (error, stack) {
+    debugPrint('UNCAUGHT ERROR: $error');
+    debugPrint('$stack');
+  });
 }
 
 class NoteTakenApp extends ConsumerWidget {
