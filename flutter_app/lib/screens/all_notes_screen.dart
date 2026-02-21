@@ -22,7 +22,7 @@ class _AllNotesScreenState extends ConsumerState<AllNotesScreen> {
     _initialized = true;
     final user = ref.read(authProvider);
     if (user != null) {
-      ref.read(notesStateProvider.notifier).init(user);
+      Future(() => ref.read(notesStateProvider.notifier).init(user));
     }
   }
 
