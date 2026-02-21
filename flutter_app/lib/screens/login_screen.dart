@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/auth_provider.dart';
@@ -94,6 +96,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       : () => _run(() => ref.read(authProvider.notifier).signInWithGoogle()),
                   child: const Text('Continue with Google'),
                 ),
+                if (kDebugMode) ...[
+                  const SizedBox(height: 16),
+                  const Divider(),
+                  const SizedBox(height: 4),
+                  FilledButton.tonal(
+                    onPressed: _loading
+                        ? null
+                        : () {
+                            final email = dotenv.env['DEV_EMAIL'] ?? '';
+                            final password = dotenv.env['DEV_PASSWORD'] ?? '';
+                            if (email.isEmpty || password.isEmpty) {
+                              setState(() => _error =
+                                  'Set DEV_EMAIL and DEV_PASSWORD in flutter_app/.env');
+                              return;
+                            }
+                            _run(
+                              () => ref
+                                  .read(authProvider.notifier)
+                                  .signInWithEmail(email, password),
+                            );
+                          },
+                    child: const Text('Dev Login'),
+                  ),
+                ],
                 if (_error != null) ...[
                   const SizedBox(height: 12),
                   Text(

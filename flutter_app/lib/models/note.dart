@@ -75,6 +75,16 @@ class Folder {
   final String? parentId;
   final DateTime createdAt;
 
+  Folder copyWith({String? name}) {
+    return Folder(
+      id: id,
+      userId: userId,
+      name: name ?? this.name,
+      parentId: parentId,
+      createdAt: createdAt,
+    );
+  }
+
   factory Folder.fromJson(Map<String, dynamic> json) {
     return Folder(
       id: json['id'] as String,

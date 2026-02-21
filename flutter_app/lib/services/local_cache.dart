@@ -1,9 +1,12 @@
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:hive/hive.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../models/note.dart';
 
 Future<void> initHive() async {
-  await Hive.initFlutter();
+  // Use AppData/Roaming — avoids OneDrive locking files in the Documents folder
+  final dir = await getApplicationSupportDirectory();
+  Hive.init(dir.path);
   await Hive.openBox<Map>('notes');
   await Hive.openBox<Map>('folders');
   await Hive.openBox<Map>('tags');

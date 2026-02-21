@@ -295,15 +295,7 @@ class NotesController extends StateNotifier<NotesState> {
     state = state.copyWith(
       folders: [
         for (final f in state.folders)
-          if (f.id == folderId)
-            Folder(
-              id: f.id,
-              userId: f.userId,
-              name: name,
-              parentId: f.parentId,
-              createdAt: f.createdAt,
-            )
-          else
+          if (f.id == folderId) f.copyWith(name: name) else
             f,
       ],
     );
