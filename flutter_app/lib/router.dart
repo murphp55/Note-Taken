@@ -1,39 +1,39 @@
-import 'dart:async';
+// TODO(supabase-restore): Re-enable GoRouterRefreshStream, refreshListenable, redirect,
+// and the /login route. Original used:
+//   import 'dart:async';
+//   import 'package:flutter/foundation.dart';
+//   import 'providers/auth_provider.dart';
+//   import 'screens/login_screen.dart';
+//   import 'services/supabase_service.dart';
+//   final refreshListenable = GoRouterRefreshStream(supabase.auth.onAuthStateChange);
+//   ref.onDispose(refreshListenable.dispose);
+//   refreshListenable: refreshListenable,
+//   redirect: (context, state) {
+//     final user = ref.read(authProvider);
+//     final onLogin = state.matchedLocation == '/login';
+//     if (user == null && !onLogin) return '/login';
+//     if (user != null && onLogin) return '/tabs/notes';
+//     return null;
+//   },
+// And the GoRouterRefreshStream class at the bottom.
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import 'providers/auth_provider.dart';
 import 'screens/all_notes_screen.dart';
 import 'screens/folders_screen.dart';
-import 'screens/login_screen.dart';
 import 'screens/new_note_screen.dart';
 import 'screens/search_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/tabs_shell.dart';
 import 'screens/tags_screen.dart';
-import 'services/supabase_service.dart';
 
 final goRouterProvider = Provider<GoRouter>((ref) {
-  final refreshListenable = GoRouterRefreshStream(
-    supabase.auth.onAuthStateChange,
-  );
-
-  ref.onDispose(refreshListenable.dispose);
-
+  // TODO(supabase-restore): Restore GoRouterRefreshStream + auth redirect (see top comments).
   return GoRouter(
     initialLocation: '/tabs/notes',
-    refreshListenable: refreshListenable,
-    redirect: (context, state) {
-      final user = ref.read(authProvider);
-      final onLogin = state.matchedLocation == '/login';
-      if (user == null && !onLogin) return '/login';
-      if (user != null && onLogin) return '/tabs/notes';
-      return null;
-    },
     routes: [
-      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+      // TODO(supabase-restore): Re-enable /login route and LoginScreen import.
       GoRoute(
         path: '/new-note',
         builder: (context, state) => NewNoteScreen(
@@ -54,17 +54,3 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     ],
   );
 });
-
-class GoRouterRefreshStream extends ChangeNotifier {
-  GoRouterRefreshStream(Stream<dynamic> stream) {
-    _subscription = stream.asBroadcastStream().listen((_) => notifyListeners());
-  }
-
-  late final StreamSubscription<dynamic> _subscription;
-
-  @override
-  void dispose() {
-    _subscription.cancel();
-    super.dispose();
-  }
-}

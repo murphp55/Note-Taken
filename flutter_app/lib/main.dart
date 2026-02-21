@@ -8,7 +8,7 @@ import 'providers/auth_provider.dart';
 import 'providers/notes_provider.dart';
 import 'router.dart';
 import 'services/local_cache.dart';
-import 'services/supabase_service.dart';
+// TODO(supabase-restore): Re-enable: import 'services/supabase_service.dart';
 
 Future<void> main() async {
   await runZonedGuarded(() async {
@@ -21,7 +21,7 @@ Future<void> main() async {
     };
 
     await dotenv.load(fileName: '.env');
-    await initSupabase();
+    // TODO(supabase-restore): Re-enable: await initSupabase();
     await initHive();
     runApp(const ProviderScope(child: NoteTakenApp()));
   }, (error, stack) {

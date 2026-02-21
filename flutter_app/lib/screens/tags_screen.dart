@@ -43,7 +43,7 @@ class _TagsScreenState extends ConsumerState<TagsScreen> {
                     : () async {
                         final value = _name.text.trim();
                         if (value.isEmpty) return;
-                        await ref.read(notesStateProvider.notifier).createTag(user.id, value);
+                        await ref.read(notesStateProvider.notifier).createTag(user, value);
                         _name.clear();
                       },
                 child: const Text('Create'),

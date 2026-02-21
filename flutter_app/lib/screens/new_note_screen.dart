@@ -26,7 +26,7 @@ class _NewNoteScreenState extends ConsumerState<NewNoteScreen> {
         return;
       }
       await ref.read(notesStateProvider.notifier).createNote(
-            user.id,
+            user,
             title: widget.title,
             content: widget.content,
           );

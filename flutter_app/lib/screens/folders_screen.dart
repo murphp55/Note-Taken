@@ -45,7 +45,7 @@ class _FoldersScreenState extends ConsumerState<FoldersScreen> {
                     : () async {
                         final value = _name.text.trim();
                         if (value.isEmpty) return;
-                        await ref.read(notesStateProvider.notifier).createFolder(user.id, value);
+                        await ref.read(notesStateProvider.notifier).createFolder(user, value);
                         _name.clear();
                       },
                 child: const Text('Create'),
